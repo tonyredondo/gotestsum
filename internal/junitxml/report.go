@@ -44,6 +44,7 @@ type JUnitTestSuite struct {
 // JUnitTestCase is a single test case with its result.
 type JUnitTestCase struct {
 	XMLName     xml.Name          `xml:"testcase"`
+	CodeOwners  string            `xml:"codeowners,attr,omitempty"`
 	Classname   string            `xml:"classname,attr"`
 	Name        string            `xml:"name,attr"`
 	Time        string            `xml:"time,attr"`
@@ -211,9 +212,10 @@ func packageTestCases(pkg *testjson.Package, formatClassname FormatFunc) []JUnit
 
 func newJUnitTestCase(tc testjson.TestCase, formatClassname FormatFunc) JUnitTestCase {
 	return JUnitTestCase{
-		Classname: formatClassname(tc.Package),
-		Name:      tc.Test.Name(),
-		Time:      formatDurationAsSeconds(tc.Elapsed),
+		CodeOwners: tc.CodeOwners,
+		Classname:  formatClassname(tc.Package),
+		Name:       tc.Test.Name(),
+		Time:       formatDurationAsSeconds(tc.Elapsed),
 	}
 }
 

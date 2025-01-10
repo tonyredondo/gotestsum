@@ -15,6 +15,7 @@ import (
 	"github.com/dnephin/pflag"
 	"github.com/fatih/color"
 	"gotest.tools/gotestsum/internal/log"
+	"gotest.tools/gotestsum/internal/util"
 	"gotest.tools/gotestsum/testjson"
 )
 
@@ -282,6 +283,9 @@ func run(opts *options) error {
 		Handler:                  handler,
 		Stop:                     cancel,
 		IgnoreNonJSONOutputLines: opts.ignoreNonJSONOutputLines,
+		ModulePath:               goTestProc.modulePath,
+		ModuleDir:                goTestProc.moduleDir,
+		RootDir:                  goTestProc.rootDir,
 	}
 	exec, err := testjson.ScanTestOutput(cfg)
 	handler.Flush()
@@ -422,7 +426,10 @@ type proc struct {
 	stderr io.Reader
 	// signal is atomically set to the signal value when a signal is received
 	// by newSignalHandler.
-	signal int32
+	signal     int32
+	modulePath string
+	moduleDir  string
+	rootDir    string
 }
 
 type waiter interface {
@@ -434,11 +441,13 @@ func startGoTest(ctx context.Context, dir string, args []string) (*proc, error) 
 		return nil, errors.New("missing command to run")
 	}
 
+	modulePath, moduleDir, rootDir := util.GetModuleInfo(dir)
+
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Dir = dir
 
-	p := proc{cmd: cmd}
+	p := proc{cmd: cmd, modulePath: modulePath, moduleDir: moduleDir, rootDir: rootDir}
 	log.Debugf("exec: %s", cmd.Args)
 	var err error
 	p.stdout, err = cmd.StdoutPipe()

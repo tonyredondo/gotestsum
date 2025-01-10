@@ -1,0 +1,7 @@
+*                                           @GoTestSum
+/cmd/                                       @GoTestSum/cmd-owners
+/cmd/tools/                                 @GoTestSum/cmd-tools-owners
+/cmd/testdata/e2e/flaky/                    @GoTestSum/cmd-testdata-e2e-flaky-owners @GoTestSum
+/testjson/internal/good/                    @GoTestSum/testjson-internal-good-owners
+/testjson/internal/parallelfails/           @GoTestSum/testjson-internal-parallelfails-owners @GoTestSum
+/testjson/internal/withfails/               @GoTestSum/testjson-internal-withfails-owners

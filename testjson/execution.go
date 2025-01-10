@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"gotest.tools/gotestsum/internal/log"
+	"gotest.tools/gotestsum/internal/util"
 )
 
 // Action of TestEvent
@@ -44,10 +45,12 @@ func (a Action) IsTerminal() bool {
 // TestEvent is a structure output by go tool test2json and go test -json.
 type TestEvent struct {
 	// Time encoded as an RFC3339-format string
-	Time    time.Time
-	Action  Action
-	Package string
-	Test    string
+	Time                time.Time
+	Action              Action
+	Package             string
+	PackageAbsolutePath string
+	CodeOwners          string
+	Test                string
 	// Elapsed time in seconds
 	Elapsed float64
 	// Output of test or benchmark
@@ -280,10 +283,12 @@ func (p *Package) end() []TestEvent {
 		p.Failed = append(p.Failed, tc)
 
 		result = append(result, TestEvent{
-			Action:  ActionFail,
-			Package: tc.Package,
-			Test:    tc.Test.Name(),
-			Elapsed: float64(neverFinished),
+			Action:              ActionFail,
+			Package:             tc.Package,
+			PackageAbsolutePath: tc.PackageAbsolutePath,
+			CodeOwners:          tc.CodeOwners,
+			Test:                tc.Test.Name(),
+			Elapsed:             float64(neverFinished),
 		})
 		delete(p.running, k)
 	}
@@ -333,6 +338,10 @@ type TestCase struct {
 	hasSubTestFailed bool
 	// Time when the test was run.
 	Time time.Time
+
+	PackageAbsolutePath string
+	PackageRelativePath string
+	CodeOwners          string
 }
 
 func newPackage() *Package {
@@ -390,11 +399,13 @@ func (p *Package) newTestCaseFromEvent(event TestEvent) TestCase {
 	// the package output
 	p.Total++
 	return TestCase{
-		Package: event.Package,
-		Test:    TestName(event.Test),
-		ID:      p.Total,
-		RunID:   event.RunID,
-		Time:    event.Time,
+		Package:             event.Package,
+		PackageAbsolutePath: event.PackageAbsolutePath,
+		CodeOwners:          event.CodeOwners,
+		Test:                TestName(event.Test),
+		ID:                  p.Total,
+		RunID:               event.RunID,
+		Time:                event.Time,
 	}
 }
 
@@ -681,6 +692,11 @@ type ScanConfig struct {
 	// IgnoreNonJSONOutputLines causes ScanTestOutput to ignore non-JSON lines received from
 	// the Stdout reader. Instead of causing an error, the lines will be sent to Handler.Err.
 	IgnoreNonJSONOutputLines bool
+
+	ModulePath string
+	ModuleDir  string
+	RootDir    string
+	codeOwners *util.CodeOwners
 }
 
 // EventHandler is called by ScanTestOutput for each event and write to stderr.
@@ -709,6 +725,9 @@ func ScanTestOutput(config ScanConfig) (*Execution, error) {
 	}
 	if config.Stop == nil {
 		config.Stop = func() {}
+	}
+	if config.codeOwners == nil {
+		config.codeOwners = util.GetCodeOwners(config.RootDir)
 	}
 	execution := config.Execution
 	if execution == nil {
@@ -762,6 +781,17 @@ func readStdout(config ScanConfig, execution *Execution) error {
 		}
 
 		event.RunID = config.RunID
+		if config.ModulePath != "" && config.ModuleDir != "" {
+			event.PackageAbsolutePath = strings.ReplaceAll(event.Package, config.ModulePath, config.ModuleDir)
+			if config.codeOwners != nil {
+				testFilePath := util.GetTestFilePath(event.PackageAbsolutePath, event.Test)
+				relativeTestFilePath := util.GetRelativePathFrom(config.RootDir, testFilePath)
+				match, found := config.codeOwners.Match("/" + relativeTestFilePath)
+				if found {
+					event.CodeOwners = match.GetOwnersString()
+				}
+			}
+		}
 		execution.add(event)
 		if err := config.Handler.Event(event, execution); err != nil {
 			return err

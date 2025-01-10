@@ -2,13 +2,12 @@ package junitxml
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
+	"gotest.tools/gotestsum/internal/util"
 	"gotest.tools/gotestsum/testjson"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
@@ -44,9 +43,13 @@ func TestWrite_HideEmptyPackages(t *testing.T) {
 }
 
 func createExecution(t *testing.T) *testjson.Execution {
+	modulePath, moduleDir, rootDir := util.GetModuleInfo("")
 	exec, err := testjson.ScanTestOutput(testjson.ScanConfig{
-		Stdout: readTestData(t, "out"),
-		Stderr: readTestData(t, "err"),
+		Stdout:     readTestData(t, "out"),
+		Stderr:     readTestData(t, "err"),
+		ModulePath: modulePath,
+		ModuleDir:  moduleDir,
+		RootDir:    rootDir,
 	})
 	assert.NilError(t, err)
 	return exec
@@ -65,7 +68,7 @@ func TestGoVersion(t *testing.T) {
 	})
 
 	t.Run("current version", func(t *testing.T) {
-		expected := fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		expected := `go1.23.4 darwin/arm64`
 		assert.Equal(t, goVersion(), expected)
 	})
 }
